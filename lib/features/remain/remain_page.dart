@@ -1,0 +1,156 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_listview_widget.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_navigationrail.dart';
+
+import 'package:kujiracchi_dart/features/remain/remain_page_remove_schedule_dialog.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_rename_schedule_dialog.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_add_schedule_dialog.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_task_dialog.dart';
+import 'package:kujiracchi_dart/features/remain/remain_page_state.dart';
+import 'package:kujiracchi_dart/features/schedule/schedule_list_provider.dart';
+import 'package:kujiracchi_dart/features/schedule/schedule_task.dart';
+
+class RemainPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheduleList = ref.watch(scheduleListProvider);
+    final remainPageState = ref.watch(remainPageStateProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Remain'),
+      ),
+      body: Row(
+        children: [
+          // 画面左のスケジュール管理メニュー
+          RemainPageNavigationRail(),
+          // 区切り線
+          const VerticalDivider(thickness: 1, width: 1),
+          // 画面右側のスケジュール表示領域
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    // スケジュール選択
+                    Expanded(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: remainPageState.selectedScheduleId,
+                        items: scheduleList.schedules.map((schedule) {
+                          return DropdownMenuItem(
+                              value: schedule.id, child: Text(schedule.name));
+                        }).toList(),
+                        onChanged: (String? value) {
+                          ref
+                              .read(remainPageStateProvider.notifier)
+                              .selectedScheduleId = value;
+                        },
+                        onTap: () {
+                          // フォーカスを外す
+                          FocusScope.of(context).requestFocus(FocusNode());
+                        },
+                      ),
+                    ),
+                    // スケジュール追加
+                    Expanded(
+                      child: IconButton.filled(
+                        onPressed: () {
+                          showDialog(
+                              context: context,
+                              builder: (context) => RemainPageAddScheduleDialog());
+                        },
+                        icon: Icon(Icons.add_outlined),
+                      ),
+                    ),
+                    // スケジュール名変更
+                    Expanded(
+                      child: IconButton.filled(
+                        onPressed: () {
+                          if (remainPageState.selectedScheduleId != null) {
+                            showDialog(
+                                context: context,
+                                builder: (context) =>
+                                    RemainPageRenameScheduleDialog());
+                          }
+                        },
+                        icon: Icon(Icons.edit_outlined),
+                      ),
+                    ),
+                    // スケジュール削除
+                    Expanded(
+                      child: IconButton.filledTonal(
+                        onPressed: () {
+                          if (remainPageState.selectedScheduleId != null) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => RemainPageRemoveScheduleDialog(
+                                  scheduleId: remainPageState.selectedScheduleId!
+                              ),
+                            );
+                          }
+                        },
+                        icon: Icon(Icons.delete_outline),
+                      ),
+                    ),
+                    // Viewを開く
+                    Expanded(
+                      child: IconButton.filled(
+                        onPressed: () {
+                          // スケジュールが選択中かつタスクが1つ以上設定されているならView画面を開く
+                          if (remainPageState.selectedScheduleId != null) {
+                            if (remainPageState.selectedTaskId != null) {
+                              Navigator.of(context).pushNamed('/remain_view');
+                            } else {
+                              // タスクが未選択の場合は先頭のタスクを選択して開く
+                              final schedule = scheduleList.getSchedule(
+                                  id: remainPageState.selectedScheduleId!);
+                              if (schedule.tasks.isNotEmpty) {
+                                Navigator.of(context).pushNamed('/remain_view');
+                                ref
+                                    .read(remainPageStateProvider.notifier)
+                                    .selectedTaskId = schedule.tasks.first.id;
+                              }
+                            }
+                          }
+                        },
+                        icon: Icon(Icons.fullscreen_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+                // タスクのリスト表示
+                Expanded(
+                  child: RemainPageScheduleTaskListViewWidget(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      // タスク追加
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () async {
+          // 何れかのスケジュールが選択状態のときにタスク追加ダイアログを表示する
+          if (remainPageState.selectedScheduleId != null) {
+            ScheduleTask? newTask = await showDialog(
+                context: context,
+                builder: (context) => TaskDialog(mode: TaskDialogMode.add),
+            );
+            // ダイアログでOKが押下された場合
+            if (newTask != null) {
+              ref.read(scheduleListProvider.notifier).addTask(
+                remainPageState.selectedScheduleId!,
+                newTask
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+}
