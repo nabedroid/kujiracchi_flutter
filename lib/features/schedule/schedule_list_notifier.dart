@@ -11,7 +11,8 @@ class ScheduleListNotifier extends StateNotifier<ScheduleList> {
   final SharedPreferences sharedPreference;
 
   ScheduleListNotifier(this.sharedPreference)
-      : super(ScheduleList.fromSharedPreferences(sharedPreference));
+      : super(ScheduleList.fromSharedPreferences(sharedPreference)) {
+  }
 
   void addSchedule(Schedule schedule) {
     state = state.copyWith(

@@ -5,15 +5,16 @@ import 'package:kujiracchi_dart/common_utils/string_util.dart';
 import 'package:kujiracchi_dart/common_widget/count_display_widget.dart';
 import 'package:kujiracchi_dart/common_widget/application_time.dart';
 import 'package:kujiracchi_dart/common_widget/application_timer.dart';
+import 'package:kujiracchi_dart/common_widget/kujira_widget.dart';
 import 'package:kujiracchi_dart/features/config/config.dart';
 import 'package:kujiracchi_dart/features/remain/remain_page_state.dart';
 import 'package:kujiracchi_dart/features/schedule/schedule.dart';
-import 'package:kujiracchi_dart/features/schedule/schedule_list.dart';
 import 'package:kujiracchi_dart/features/schedule/schedule_list_provider.dart';
 import 'package:kujiracchi_dart/features/schedule/schedule_task.dart';
 
 /// 選択されているスケジュールを公開する
-final _remainPageSelectedScheduleProvider = Provider.autoDispose<Schedule>((ref) {
+final _remainPageSelectedScheduleProvider =
+    Provider.autoDispose<Schedule>((ref) {
   final scheduleList = ref.watch(scheduleListProvider);
   final remainPageState = ref.watch(remainPageStateProvider);
 
@@ -21,8 +22,8 @@ final _remainPageSelectedScheduleProvider = Provider.autoDispose<Schedule>((ref)
 });
 
 /// 選択されているタスクを公開する
-final _remainViewSelectedTaskProvider = Provider.autoDispose<ScheduleTask>((ref) {
-
+final _remainViewSelectedTaskProvider =
+    Provider.autoDispose<ScheduleTask>((ref) {
   final scheduleList = ref.watch(scheduleListProvider);
   final remainPageState = ref.watch(remainPageStateProvider);
 
@@ -31,7 +32,6 @@ final _remainViewSelectedTaskProvider = Provider.autoDispose<ScheduleTask>((ref)
 
 /// 選択されているタスクの終了時刻を公開する
 final _remainViewStopTimeProvider = Provider.autoDispose<int>((ref) {
-
   final applicationDateTime = ref.watch(applicationTimeProvider);
   final selectedTask = ref.watch(_remainViewSelectedTaskProvider);
   final (h, m, s) = StringUtil.hmsToInt(selectedTask.time);
@@ -51,63 +51,94 @@ final _remainViewStopTimeProvider = Provider.autoDispose<int>((ref) {
   return stopTime.millisecondsSinceEpoch;
 });
 
-class RemainViewPage extends ConsumerStatefulWidget {
-  const RemainViewPage({Key? key}) : super(key: key);
+/// 選択中タスクまでの残り時間を公開する
+final _remainTimeProvider = StateProvider.autoDispose<int>((ref) {
+  final applicationDateTime = ref.watch(applicationTimerProvider);
+  final stopTime = ref.watch(_remainViewStopTimeProvider);
+
+  return stopTime - applicationDateTime.millisecondsSinceEpoch;
+});
+
+/// 残り時間が0秒以下か公開する
+/// 0秒以下の場合は次のタスクへ自動送りする
+final _isTimeOverProvider = StateProvider.autoDispose((ref) {
+  final remainTime = ref.watch(_remainTimeProvider);
+  // タイムオーバーになった場合に自動送りを行う
+  ref.listenSelf((pre, next) {
+    if (next == true) {
+      // タイムオーバーになった場合
+      final task = ref.read(_remainViewSelectedTaskProvider);
+      if (task.auto) {
+        // 自動送り機能が有効な場合
+        final schedule = ref.read(_remainPageSelectedScheduleProvider);
+        int index = schedule.getTaskIndex(task.id)!;
+        if (0 <= index && index + 1 < schedule.tasks.length) {
+          // 次のタスクが存在する場合は選択中タスクを更新する
+          ref.read(remainPageStateProvider.notifier).selectedTaskId =
+              schedule.tasks.elementAt(index + 1).id;
+        }
+      }
+    }
+  });
+
+  return remainTime <= 0;
+});
+
+/// タスクの残り時間を全画面表示する
+class RemainViewPage extends ConsumerWidget {
 
   @override
-  ConsumerState<ConsumerStatefulWidget> createState() {
-    return _RemainViewPageState();
-  }
-}
-
-class _RemainViewPageState extends ConsumerState<RemainViewPage> {
-
-  late final ScheduleList _scheduleList;
-
-  @override
-  void initState() {
-    super.initState();
-    _scheduleList = ref.read(scheduleListProvider);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 選択中のスケジュール
     final schedule = ref.watch(_remainPageSelectedScheduleProvider);
-    final config = ref.watch(configProvider);
-    final applicationDateTime = ref.watch(applicationTimerProvider);
+    // 選択中のタスク
     final task = ref.watch(_remainViewSelectedTaskProvider);
-    final stopTime = ref.watch(_remainViewStopTimeProvider);
-
-    // 残り時間の計算
+    // 残り時間が0以下かのフラグ
+    final isTimeOver = ref.watch(_isTimeOverProvider);
 
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // タイトル、戻るボタン
+          // タイトル、くじらボタン
           Row(
             children: [
+              // タイトル（タスクのメモ）
               Expanded(
                 child: Text(
                   task.memo,
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
-              Expanded(
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back),
-                  onPressed: () {
+              // くじらボタン
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: KujiraWidget(
+                  onSlided: () {
                     Navigator.of(context).pop();
                   },
                 ),
               ),
             ],
           ),
-          // アプリ時間
-          Text(
-            '1', //applicationDateTime.toIso8601String(),
-            style: Theme.of(context).textTheme.headlineSmall,
+          // アプリ時間、タイムオーバー
+          Stack(
+            children: [
+              // タスクの設定時間
+              Text(
+                '終 ${task.time}', //applicationDateTime.toIso8601String(),
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              // タイムオーバー時の"オーバー"テキスト
+              if (isTimeOver)
+                Center(
+                  child: Text('オーバー',
+                      style: Theme.of(context)
+                          .textTheme
+                          .displaySmall!
+                          .copyWith(color: Colors.red)),
+                ),
+            ],
           ),
           // 上下ボタン、残り時間、上下ボタン
           Expanded(
@@ -116,38 +147,23 @@ class _RemainViewPageState extends ConsumerState<RemainViewPage> {
               children: [
                 // 上下ボタン
                 _RemainViewScheduleUpDownButtons(
-                  onUpPressed: () {
-                    int index = -1;
-                    schedule.tasks.forEachIndexed((i, element) {
-                      if (element.id == task.id) {
-                        index = i;
-                      }
-                    });
-                    if (0 < index) {
-                      ref.read(remainPageStateProvider.notifier).selectedTaskId = schedule.tasks.elementAt(index - 1).id;
-                    }
-                  },
-                  onDownPressed: () {
-                    int index = -1;
-                    schedule.tasks.forEachIndexed((i, element) {
-                      if (element.id == task.id) {
-                        index = i;
-                      }
-                    });
-                    if (0 <= index && index + 1 < schedule.tasks.length) {
-                      ref.read(remainPageStateProvider.notifier).selectedTaskId = schedule.tasks.elementAt(index + 1).id;
-                    }
-
-                  },
+                  onUpPressed: () => _onUpPressed(
+                      selectedSchedule: schedule, selectedTask: task, ref: ref),
+                  onDownPressed: () => _onDownPressed(
+                      selectedSchedule: schedule, selectedTask: task, ref: ref),
                 ),
                 // 残り時間
-                Expanded(child: CountDisplayWidget(
-                  count: stopTime - applicationDateTime.millisecondsSinceEpoch, //stopTime - applicationDateTime.millisecondsSinceEpoch,
-                  decimalDigits: config.remainDecimalDigits,
-                  isCountUp: false,
-                )),
+                Expanded(
+                  child: _RemainViewTime(),
+                ),
                 // 上下ボタン
                 //_RemainViewScheduleUpDownButtons(),
+                _RemainViewScheduleUpDownButtons(
+                  onUpPressed: () => _onUpPressed(
+                      selectedSchedule: schedule, selectedTask: task, ref: ref),
+                  onDownPressed: () => _onDownPressed(
+                      selectedSchedule: schedule, selectedTask: task, ref: ref),
+                ),
               ],
             ),
           ),
@@ -155,10 +171,58 @@ class _RemainViewPageState extends ConsumerState<RemainViewPage> {
       ),
     );
   }
+
+  /// 上ボタン押下時の処理
+  /// 一つ前のタスクを選択状態にする
+  void _onUpPressed({
+    required Schedule selectedSchedule,
+    required ScheduleTask selectedTask,
+    required WidgetRef ref,
+  }) {
+    int index = -1;
+    selectedSchedule.tasks.forEachIndexed((i, element) {
+      if (element.id == selectedTask.id) {
+        index = i;
+      }
+    });
+    if (0 < index) {
+      ref.read(remainPageStateProvider.notifier).selectedTaskId =
+          selectedSchedule.tasks.elementAt(index - 1).id;
+    }
+  }
+
+  /// 下ボタン押下時の処理
+  /// 次のタスクを選択状態にする
+  void _onDownPressed({
+    required Schedule selectedSchedule,
+    required ScheduleTask selectedTask,
+    required WidgetRef ref,
+  }) {
+    int index = selectedSchedule.getTaskIndex(selectedTask.id) ?? -1;
+    if (0 <= index && index + 1 < selectedSchedule.tasks.length) {
+      ref.read(remainPageStateProvider.notifier).selectedTaskId =
+          selectedSchedule.tasks.elementAt(index + 1).id;
+    }
+  }
 }
 
-class _RemainViewScheduleUpDownButtons extends StatelessWidget {
+/// 残り時間を表示する
+/// 更新頻度が高いので別クラスとして切り出し
+class _RemainViewTime extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remainTime = ref.watch(_remainTimeProvider);
+    final config = ref.watch(configProvider);
+    return CountDisplayWidget(
+      count: remainTime,
+      decimalDigits: config.remainDecimalDigits,
+      isCountUp: false,
+    );
+  }
+}
 
+/// 画面の両端に表示されるタスクを上下するボタン
+class _RemainViewScheduleUpDownButtons extends StatelessWidget {
   final VoidCallback onUpPressed;
   final VoidCallback onDownPressed;
 
@@ -188,7 +252,7 @@ class _RemainViewScheduleUpDownButtons extends StatelessWidget {
                   //hoverColor: Colors.transparent,
                   //splashColor: Colors.transparent,
                   //highlightColor: Colors.transparent,
-                  icon: Icon(Icons.arrow_drop_up),
+                  icon: const Icon(Icons.arrow_drop_up),
                   onPressed: onUpPressed,
                 ),
               ),
@@ -198,7 +262,7 @@ class _RemainViewScheduleUpDownButtons extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.fitWidth,
               child: IconButton(
-                icon: Icon(Icons.arrow_drop_down),
+                icon: const Icon(Icons.arrow_drop_down),
                 onPressed: onDownPressed,
               ),
             ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:screen_brightness/screen_brightness.dart';
+
 import 'package:kujiracchi_dart/common_utils/string_util.dart';
 import 'package:kujiracchi_dart/common_widget/custom_slider_widget.dart';
 import 'package:kujiracchi_dart/features/config/config.dart';
@@ -34,7 +37,6 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
 
   @override
   Widget build(BuildContext context) {
-    //final state = ref.watch(configPageStateProvider(_config));
     final mode = ref.watch(_configPageStateProvider);
     final config = ref.watch(configProvider);
     final trailingWidth = MediaQuery.of(context).size.width * 0.2;
@@ -81,6 +83,26 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
                     onTapOutside: (e) => primaryFocus?.unfocus(),
                   ),
                 ),
+              ),
+              _buildCharRatioListTile(
+                title: 'くじらアイコンのサイズ',
+                trailingWidth: trailingWidth,
+                value: config.kujiraIconSize,
+                min: 32,
+                max: 256,
+                divisions: 7,
+                onChanged: (value) =>
+                ref.read(configProvider.notifier).kujiraIconSize = value,
+              ),
+              _buildCharRatioListTile(
+                title: 'スクリーン輝度',
+                trailingWidth: trailingWidth,
+                value: config.screenBrightness,
+                min: 1,
+                max: 100,
+                divisions: 100,
+                onChanged: (value) =>
+                ref.read(configProvider.notifier).screenBrightness = value,
               ),
               // メニュー長押しで詳細設定モードにする
               if (mode == _ConfigPageMode.normal)
@@ -223,7 +245,9 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
     required double trailingWidth,
     required int value,
     required Function(int) onChanged,
+    int min = 0,
     int max = 20,
+    int? divisions,
   }) {
     return ListTile(
       title: Text(title),
@@ -232,8 +256,9 @@ class _ConfigPageState extends ConsumerState<ConfigPage> {
         child: SliderWrapper(
           child: Slider(
             value: value.toDouble(),
+            min: min.toDouble(),
             max: max.toDouble(),
-            divisions: max,
+            divisions: divisions ?? max - min,
             label: value.toString(),
             onChanged: (double value) {
               onChanged(value.toInt());

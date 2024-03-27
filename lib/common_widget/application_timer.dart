@@ -45,6 +45,12 @@ class TimerNotifier extends StateNotifier<int> {
     }
   }
 
+  void reset() {
+    _startTime = DateTime.now().millisecondsSinceEpoch;
+    _stopTime = 0;
+    state = 0;
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

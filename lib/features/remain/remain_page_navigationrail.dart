@@ -76,12 +76,6 @@ class RemainPageNavigationRail extends ConsumerWidget {
             label: Text('スケジュール追加'),
           ),
         ],
-        trailing: Expanded(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Icon(Icons.abc),
-          ),
-        ),
         selectedIndex: null,
       ),
     );
@@ -233,7 +227,9 @@ class RemainPageNavigationRail extends ConsumerWidget {
           ref: ref);
     } else if (index == schedulesCount + 1) {
       // スケジュール追加
-      _addSchedule(ref: ref);
+      final newSchedule = _addSchedule(ref: ref);
+      // 選択状態にする
+      _selectSchedule(schedule: newSchedule, scheduleList: scheduleList, ref: ref);
     }
   }
 
@@ -259,9 +255,9 @@ class RemainPageNavigationRail extends ConsumerWidget {
   }
 
   /// スケジュールを追加する
-  void _addSchedule({required WidgetRef ref}) {
-    ref.read(scheduleListProvider.notifier).addSchedule(
-          Schedule(name: '新しいスケジュール${DateTime.now().millisecond}'),
-        );
+  Schedule _addSchedule({required WidgetRef ref}) {
+    Schedule newSchedule = Schedule(name: '新しいスケジュール${DateTime.now().millisecond}');
+    ref.read(scheduleListProvider.notifier).addSchedule(newSchedule);
+    return newSchedule;
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'stopwatch_widget.dart';
+import 'package:kujiracchi_dart/features/stopwatch/stopwatch_widget.dart';
 
 class StopwatchPage extends ConsumerWidget {
   @override

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:kujiracchi_dart/features/schedule/schedule_task.dart';
@@ -54,6 +55,22 @@ class Schedule {
       'createAt': createAt,
       'updateAt': updateAt,
     };
+  }
+
+  ScheduleTask? getTask({required String taskId}) {
+    return tasks.singleWhereOrNull((ScheduleTask t) => t.id == taskId);
+  }
+
+  int? getTaskIndex(String taskId) {
+    int? index;
+
+    tasks.forEachIndexed((i, element) {
+      if (element.id == taskId) {
+        index = i;
+      }
+    });
+
+    return index;
   }
 
   String toJsonString() {

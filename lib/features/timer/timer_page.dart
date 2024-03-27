@@ -1,168 +1,139 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
+import 'package:kujiracchi_dart/common_widget/application_timer.dart';
+import 'package:kujiracchi_dart/common_widget/count_display_widget.dart';
+import 'package:kujiracchi_dart/common_widget/setting_time_dialog.dart';
+import 'package:kujiracchi_dart/features/config/config.dart';
 
-class Task {
-  final String id;
-  final String task;
-
-  const Task(this.id, this.task);
-
-  Task copyWith({String? id, String? task}) {
-    return Task(id ?? this.id, task ?? this.task);
-  }
+enum _TimerState {
+  running,
+  stop,
 }
 
-class Data {
-  final String id;
-  final String value;
-  final List<Task> tasks;
+final _timerPageStateProvider =
+    StateProvider.autoDispose<_TimerState>((ref) => _TimerState.stop);
 
-  const Data(this.id, this.value, this.tasks);
+final _timerPageSettingTimeProvider = StateProvider.autoDispose<int>((ref) => 0);
 
-  Data copyWith({String? id, String? value, List<Task>? tasks}) {
-    return Data(id ?? this.id, value ?? this.value, tasks ?? this.tasks);
-  }
-}
-
-class DataNotifier extends StateNotifier<Data?> {
-  DataNotifier(Data? d) : super(d);
-
-  set id(String id) => state = state?.copyWith(id: id);
-
-  set value(String value) => state = state?.copyWith(value: value);
-
-  void add(Task task) =>
-      state = state?.copyWith(tasks: [...state!.tasks, task]);
-
-  void remove(Task task) => state = state?.copyWith(tasks: state!.tasks.where((t) => t.id != task.id).toList());
-
-  void update(Task task) => state = state?.copyWith(
-      tasks: state!.tasks.map((t) => t.id == task.id ? task : t).toList());
-}
-
-class DataListNotifier extends StateNotifier<List<Data>> {
-  DataListNotifier() : super([]);
-
-  void add(Data data) {
-    state = [...state, data];
-  }
-
-  void remove(Data data) {
-    state = state.where((d) => d != data).toList();
-  }
-
-  void update(Data data) {
-    state = state.map((d) => d.id == data.id ? data : d).toList();
-  }
-}
-
-final dataListProvider =
-    StateNotifierProvider<DataListNotifier, List<Data>>((ref) {
-  return DataListNotifier();
+final _timerCountProvider = StateNotifierProvider.autoDispose<TimerNotifier, int>((ref) {
+  return TimerNotifier(50, false);
 });
-
-final dataProvider = StateNotifierProvider.autoDispose
-    .family<DataNotifier, Data?, String?>((ref, id) {
-  final dataList = ref.watch(dataListProvider);
-  int index = dataList.indexWhere((data) => data.id == id);
-  return index >= 0 ? DataNotifier(dataList[index]) : DataNotifier(null);
-});
-
-final selectIdProvider = StateProvider.autoDispose<String?>((ref) => null);
 
 class TimerPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dataList = ref.watch(dataListProvider);
-    final selectId = ref.watch(selectIdProvider);
-    final data = ref.watch(dataProvider(selectId));
+    final config = ref.watch(configProvider);
+    final settingTime = ref.watch(_timerPageSettingTimeProvider);
+    final count = ref.watch(_timerCountProvider);
+    final state = ref.watch(_timerPageStateProvider);
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Timer'),
       ),
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  final addData = Data(Uuid().v4(), 'value', []);
-                  ref.read(dataListProvider.notifier).add(addData);
-                },
-                child: const Text('Add'),
+          Expanded(
+            flex: 8,
+            child: GestureDetector(
+              onTap: () => _onSettingTimePressed(
+                context: context,
+                state: state,
+                ref: ref,
               ),
-              ElevatedButton(
-                onPressed: () {
-                  if (data != null) {
-                    Data d = data;
-                    ref.read(selectIdProvider.notifier).state = null;
-                    ref.read(dataListProvider.notifier).remove(d);
-                  }
-                },
-                child: const Text('Remove'),
+              child: CountDisplayWidget(
+                isCountUp: false,
+                decimalDigits: config.timerDecimalDigits,
+                count: settingTime - count,
               ),
-              ElevatedButton(
-                onPressed: () {
-                  if (data != null) {
-                    ref.read(dataListProvider.notifier).update(
-                        data.copyWith(value: '${Random().nextInt(100)}'));
-                  }
-                },
-                child: const Text('rename'),
-              ),
-            ],
+            ),
           ),
-          DropdownButton(
-            value: selectId,
-            items: [
-              for (Data data in dataList)
-                DropdownMenuItem(
-                    value: data.id,
-                    child: Text(
-                        'id: ${data.id.substring(0, 3)} value: ${data.value} tasks: ${data.tasks.length}]')),
-            ],
-            onChanged: (Object? value) {
-              ref.read(selectIdProvider.notifier).state = value as String?;
-            },
-          ),
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  ref
-                      .read(dataProvider(selectId).notifier)
-                      .add(Task(Uuid().v4(), 'new task'));
-                },
-                child: const Text('Add'),
+          Expanded(
+            flex: 1,
+            child: Align(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 再生、停止ボタン
+                  state == _TimerState.stop
+                      ? _buildStopwatchControlButtons(
+                          icon: Icon(Icons.play_arrow),
+                          onPressed: () => _onPlayPressed(state: state, ref: ref),
+                        )
+                      : _buildStopwatchControlButtons(
+                          icon: Icon(Icons.stop),
+                          onPressed: () => _onStopPressed(state: state, ref: ref),
+                        ),
+                  _buildStopwatchControlButtons(
+                    icon: Icon(Icons.restart_alt),
+                    onPressed: () => _onResetPressed(state: state, ref: ref),
+                  ),
+                ],
               ),
-              ElevatedButton(
-                onPressed: () {},
-                child: const Text('Remove'),
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                child: const Text('Edit'),
-              ),
-            ],
-          ),
-          SizedBox(
-            width: 500,
-            height: 200,
-            child: ListView(
-              children: [
-                if (data != null)
-                  for (Task task in data.tasks)
-                    Text('id: ${task.id} task: ${task.task}'),
-              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildStopwatchControlButtons({
+    required Widget icon,
+    required void Function() onPressed,
+  }) {
+    return FittedBox(
+      child: IconButton(
+        icon: icon,
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  void _onPlayPressed({required _TimerState state, required WidgetRef ref}) {
+    if (state == _TimerState.stop) {
+      ref.read(_timerCountProvider.notifier).start();
+      ref
+          .read(_timerPageStateProvider.notifier)
+          .state = _TimerState.running;
+    }
+  }
+
+  void _onStopPressed({required _TimerState state, required WidgetRef ref}) {
+    if (state == _TimerState.running) {
+      ref.read(_timerCountProvider.notifier).stop();
+      ref
+          .read(_timerPageStateProvider.notifier)
+          .state = _TimerState.stop;
+    }
+  }
+
+  void _onResetPressed({required _TimerState state, required WidgetRef ref}) {
+    if (state == _TimerState.stop) {
+      ref.read(_timerCountProvider.notifier).reset();
+    }
+  }
+
+  void _onSettingTimePressed({
+    required BuildContext context,
+    required _TimerState state,
+    required WidgetRef ref,
+  }) async {
+    if (state == _TimerState.stop) {
+      // 停止状態の場合のみダイアログを開く
+      final result = await showDialog(
+        context: context,
+        builder: (context) {
+          return SettingTimeDialog();
+        },
+      );
+      if (result != null) {
+        // タイマー初期化
+        ref.read(_timerCountProvider.notifier).reset();
+        // 時間設定
+        ref.read(_timerPageSettingTimeProvider.notifier).state = (result.hour * 3600 + result.min  * 60 + result.sec) * 1000;
+      }
+    }
   }
 }

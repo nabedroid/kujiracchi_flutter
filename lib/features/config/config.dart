@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Config {
+  final int kujiraIconSize;
   final int systemTimeDiff;
   final int hourCharRatio;
   final String hourMinSeparator;
@@ -19,8 +21,10 @@ class Config {
   final int stopwatchDecimalDigits;
   final int remainDecimalDigits;
   final int remainViewUpDownButtonsRatio;
+  final int screenBrightness;
 
   const Config({
+    this.kujiraIconSize = 64,
     this.systemTimeDiff = 0,
     this.hourCharRatio = 8,
     this.hourMinSeparator = ':',
@@ -36,10 +40,12 @@ class Config {
     this.stopwatchDecimalDigits = 1,
     this.remainDecimalDigits = 0,
     this.remainViewUpDownButtonsRatio = 1,
+    this.screenBrightness = 100,
   });
 
   factory Config.fromJson(Map<String, dynamic> json) {
     return Config(
+      kujiraIconSize: json['kujiraIconSize'],
       systemTimeDiff: json['systemTimeDiff'],
       hourCharRatio: json['hourCharRatio'],
       hourMinSeparator: json['hourMinSeparator'],
@@ -55,6 +61,7 @@ class Config {
       stopwatchDecimalDigits: json['stopwatchDecimalDigits'],
       remainDecimalDigits: json['remainDecimalDigits'],
       remainViewUpDownButtonsRatio: json['remainViewUpDownButtonsRatio'],
+      screenBrightness: json['screenBrightness'],
     );
   }
   
@@ -73,6 +80,7 @@ class Config {
   }
 
   Config copyWith({
+    int? kujiraIconSize,
     int? systemTimeDiff,
     int? hourCharRatio,
     String? hourMinSeparator,
@@ -88,8 +96,10 @@ class Config {
     int? stopwatchDecimalDigits,
     int? remainDecimalDigits,
     int? remainViewUpDownButtonsRatio,
+    int? screenBrightness,
   }) {
     return Config(
+      kujiraIconSize: kujiraIconSize ?? this.kujiraIconSize,
       systemTimeDiff: systemTimeDiff ?? this.systemTimeDiff,
       hourCharRatio: hourCharRatio ?? this.hourCharRatio,
       hourMinSeparator: hourMinSeparator ?? this.hourMinSeparator,
@@ -109,12 +119,17 @@ class Config {
       remainDecimalDigits: remainDecimalDigits ?? this.remainDecimalDigits,
       remainViewUpDownButtonsRatio:
           remainViewUpDownButtonsRatio ?? this.remainViewUpDownButtonsRatio,
+      screenBrightness: screenBrightness ?? this.screenBrightness,
     );
   }
 }
 
 class ConfigNotifier extends StateNotifier<Config> {
   ConfigNotifier() : super(Config());
+
+  set kujiraIconSize(int kujiraIconSize) {
+    state = state.copyWith(kujiraIconSize: kujiraIconSize);
+  }
 
   set systemTimeDiff(int systemTimeDiff) {
     state = state.copyWith(systemTimeDiff: systemTimeDiff);
@@ -175,6 +190,10 @@ class ConfigNotifier extends StateNotifier<Config> {
   set remainViewUpDownButtonsRatio(int remainViewUpDownButtonsRatio) {
     state = state.copyWith(
         remainViewUpDownButtonsRatio: remainViewUpDownButtonsRatio);
+  }
+
+  set screenBrightness(int screenBrightness) {
+    state = state.copyWith(screenBrightness: screenBrightness);
   }
 }
 

@@ -16,6 +16,8 @@ Future<void> main() async {
   // runApp(ProviderScope(child: const MyApp()));
   // runApp(LoadingScreen());
   // Get the instance of shared preferences
+  // 非同期事前処理
+  WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   return runApp(
     ProviderScope(
